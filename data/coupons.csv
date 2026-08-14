@@ -1,0 +1,4 @@
+coupon_code,expected_discount
+SAVE10,10
+BIGBUY,50000
+VIP100,100000

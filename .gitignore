@@ -1,2 +1,7 @@
 HW05_Plan.md
 HW05_Summary.md
+tools/
+*.zip
+node_modules/
+*.log
+*.ps1
