@@ -3,11 +3,10 @@
 Mục tiêu của Stress Test là tăng dần tải (load) vượt quá giới hạn thiết kế (capacity) để tìm ra điểm gãy (breaking point) của hệ thống Node.js + SQLite.
 
 ## 1. Thread count pattern (Start → Step → Max)
-Vì chúng ta đã thiết lập Baseline Load Test ở mức 22 Threads, Stress Test cần đẩy cao hơn nhiều để ép hệ thống gục ngã.
 - **Start**: 10 Threads
-- **Step**: Tăng thêm 10 Threads sau mỗi chu kỳ
-- **Max**: 100 đến 150 Threads (với hardware i7-1260P, số lượng này thừa sức khiến SQLite và Node.js event-loop bị block).
-*(Chú ý: Bắt buộc phải Recycle tài khoản vì Max > 22)*
+- **Step**: Tăng thêm 2-5 Threads sau mỗi chu kỳ
+- **Max**: **22 Threads** (Giới hạn phần cứng có thể chịu hơn, nhưng ta bị giới hạn bởi số lượng 22 accounts. Việc ép lên 100 Threads và tái sử dụng 22 accounts sẽ gây ra lỗi Race Condition trên In-memory Cart, làm sai lệch logic bài test).
+*(Để ép tải gục ngã hệ thống với 22 Threads, ta phải loại bỏ hoàn toàn Think-time để đẩy Request Per Second - RPS lên cao nhất, thay vì tăng số lượng Threads ảo).*
 
 ## 2. Implement stepping: Dùng Plugin
 **Đề xuất:** Cài đặt và sử dụng Plugin **`bzm - Concurrency Thread Group`** (nằm trong bộ JMeter Plugins Manager / Custom Thread Groups).
@@ -32,14 +31,9 @@ Vì chúng ta đã thiết lập Baseline Load Test ở mức 22 Threads, Stress
    - *Kết luận Breaking Point*: Hệ thống bị coi là "gãy" khi Response Time trung bình ở percentiles thứ 90 (90th PCT) của toàn workflow vượt qua ngưỡng 5 giây hoặc Error rate > 5%.
 
 ## 6. Xử lý rủi ro "Lockout xảy ra do Timeout"
-**Vấn đề cực kỳ nguy hiểm**: Khi hệ thống bị stress, Node.js sẽ xử lý rất chậm. Endpoint `POST /api/login` (chạy bcrypt) có thể bị Timeout. Bug của SUT lại xem mọi xử lý bất thường (như timeout giữa chừng hoặc DB lỗi) khi query Auth là "đăng nhập thất bại" và cộng dồn bộ đếm. Do ta tái sử dụng (recycle) 22 accounts song song liên tục, nếu 1 account bị kẹt timeout 3 lần, nó sẽ bị khóa vĩnh viễn, dẫn đến toàn bộ Stress Test sụp đổ (Error rate đạt 100% không phải do tải SUT, mà do khóa tài khoản).
+**Vấn đề**: Khi hệ thống bị stress, Node.js sẽ xử lý rất chậm. Endpoint `POST /api/login` (chạy bcrypt) có thể bị Timeout. Bug của SUT lại xem mọi xử lý bất thường khi query Auth là "đăng nhập thất bại". Nếu timeout xảy ra, tài khoản sẽ bị khóa, Error Rate vọt lên 100%.
 
-**Giải pháp (Workaround): Bóc tách bước Login ra khỏi Stress Loop**
-Để thực sự đo lường tải của các tính năng cốt lõi (Cart, Checkout, Profile) mà không bị "chết yểu" bởi hệ thống Auth tồi:
-1. **Tạo `setUp Thread Group`**: Chạy 1 vòng duy nhất (Loop = 1) với 22 Threads.
-2. Thực hiện `POST /api/login` cho 22 accounts từ CSV.
-3. Trích xuất `${token}` bằng JSON Extractor.
-4. Ghi các token này ra một file phụ hoặc đẩy vào `JMeter Properties` (dùng cấu trúc `${__setProperty(token_${user_id}, ${token},)}`).
-5. **Trong `bzm - Concurrency Thread Group` (Stress Test Loop)**: Xóa bước `POST /api/login`. Các Thread chỉ đọc token đã được lưu (ví dụ từ CSV token hoặc properties) và bắn trực tiếp các request từ Bước 2 đến Bước 10.
-
-*Cách này đảm bảo SUT chịu stress chính xác vào các chức năng kinh doanh (Cart, Order, Products) và DB Locks, đồng thời né hoàn toàn việc bị hỏng test giữa chừng do Bug Lockout tài khoản.*
+**Giải pháp đúng đắn**: KHÔNG ĐƯỢC bóc tách hay bỏ qua bước Login.
+- Việc hệ thống sụp đổ vì nghẽn CPU ở hàm băm mật khẩu và dẫn tới khóa tài khoản CHÍNH LÀ **Breaking Point** thực sự của kiến trúc này.
+- Bài test phải giữ nguyên `POST /api/login` trong vòng lặp. Nếu SUT tự khóa tài khoản do tải cao, đó là bằng chứng (evidence) rõ ràng nhất cho thấy SUT không chịu nổi tải, và phải báo cáo đúng như vậy vào tài liệu phân tích thay vì dùng mẹo JMeter để né lỗi.
+- Cần có script độc lập (chạy ngoài JMeter) để Reset lại số lần login sai trong SQLite DB giữa các lần chạy test.

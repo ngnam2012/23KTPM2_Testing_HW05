@@ -7,8 +7,8 @@ Mục tiêu của Spike Test là đánh giá xem hệ thống có thể "sống 
 - **Justify**: Đây là mức tải mà SUT có thể xử lý trơn tru. Ta duy trì tải nền để kiểm tra xem sau khi Spike qua đi, hệ thống có trở lại trạng thái xử lý bình thường ở mức 22 threads hay không.
 
 ## 2. Spike threads (Đỉnh tải)
-- **Đề xuất**: **80 đến 100 Threads** (gấp khoảng **4 đến 5 lần** tải Baseline).
-- **Justify**: Spike Test thường đẩy mức tải lên 3x - 5x so với tải thông thường (mô phỏng sự kiện Flash Sale hoặc gửi Push Notification). Nếu dùng 100 threads, SQLite sẽ lập tức bị contention (xung đột khóa ghi) dữ dội, đồng thời lượng Cart tạo ra in-memory sẽ tạo sức ép khổng lồ lên Garbage Collector của Node.js.
+- **Đề xuất**: Tăng tải bằng cách **giảm Think-time về 0** thay vì tăng số lượng Threads ảo lên 100. Vẫn giữ nguyên 22 Threads nhưng tăng tối đa Request Per Second.
+- **Justify**: Nếu dùng 100 threads với 22 tài khoản, nhiều threads sẽ tái sử dụng chung 1 tài khoản, dẫn đến Race Condition trên giỏ hàng (Cart) in-memory. Lỗi logic (đụng độ giỏ hàng) sẽ làm nhiễu kết quả của Spike Test. Việc đẩy mức độ Spike (Spike load) lúc này phải được thực hiện thông qua tăng tốc độ gửi request thay vì tăng số lượng Users (Threads).
 
 ## 3. Spike duration (Thời gian kéo dài đỉnh tải)
 - **Đề xuất**: **1 đến 2 phút** cho mỗi lần spike.
@@ -25,20 +25,12 @@ Mục tiêu của Spike Test là đánh giá xem hệ thống có thể "sống 
 - **Justify**: Đợt Spike đầu tiên chứng minh hệ thống không bị sập lập tức. Đợt Spike thứ 2 và 3 chứng minh hệ thống không bị rò rỉ (leak) tài nguyên dài hạn. Nếu rò rỉ memory ở Cart không được dọn dẹp, đợt Spike thứ 3 có thể làm Node.js báo lỗi `Out of Memory` và sập hoàn toàn.
 
 ## 6. JMeter Implementation
-Để vẽ được biểu đồ sóng (Spike), công cụ chuẩn mực nhất là **Plugin `bzm - Ultimate Thread Group`**. 
-Cấu hình Schedule Record (Các hàng kịch bản):
-
-1. **Hàng 1 (Baseline)**:
-   - Start Threads: 22 | Initial Delay: 0 | Startup Time: 10s | Hold Load For: 1800s (30 phút) | Shutdown Time: 10s
-2. **Hàng 2 (Spike 1)**:
-   - Start Threads: 78 | Initial Delay: 300s (Phút thứ 5) | Startup Time: 10s | Hold Load: 60s | Shutdown Time: 10s
-3. **Hàng 3 (Spike 2)**:
-   - Start Threads: 78 | Initial Delay: 720s (Phút 12) | Startup Time: 10s | Hold Load: 60s | Shutdown Time: 10s
-4. **Hàng 4 (Spike 3)**:
-   - Start Threads: 78 | Initial Delay: 1140s (Phút 19) | Startup Time: 10s | Hold Load: 60s | Shutdown Time: 10s
-
-*(Tổng số Threads tại đỉnh Spike = 22 Baseline + 78 Spike = 100 Threads).*
+Vì ta bị giới hạn ở 22 accounts và không thể sử dụng > 22 threads mà không làm hỏng dữ liệu, giải pháp JMeter Implementation cho Spike Test lúc này là **Sử dụng Timer động** thay vì Ultimate Thread Group.
+- Vẫn dùng **Thread Group bình thường** với 22 Threads, lặp liên tục.
+- Thiết lập một cấu trúc **If Controller** hoặc **JSR223 Timer** để tự động đặt Think-time (VD: 3000ms) ở chế độ Baseline. Khi đạt tới một số mốc thời gian (như phút thứ 5, 12, 19), Timer tự động chuyển về 0ms trong 1 phút để tạo Spike (tăng đột biến RPS) rồi lại tăng Think-time lên.
+*(Nếu bắt buộc phải dùng Ultimate Thread Group với 100 threads, bạn bắt buộc phải có script sinh thêm 78 account nữa vào DB trước khi test).*
 
 > [!WARNING]
-> **Vấn đề Lockout Bug**: Giống như Stress Test, khi 100 threads dồn vào cùng một lúc, `POST /login` sẽ dễ bị timeout. Do SUT hiểu timeout là sai pass, 22 tài khoản test sẽ bị khóa sạch ngay ở Spike đầu tiên.
-> **Workaround**: Bạn VẪN PHẢI bóc tách `POST /login` ra khỏi Ultimate Thread Group. Chạy Auth 1 lần trước đó để lưu mảng Token, sau đó bước vào Spike Test chỉ với các giao dịch nội bộ từ bước 2 đến bước 10. Lúc này, Spike Test sẽ hoàn toàn tập trung vào việc tra tấn Memory (bằng Cart in-memory) và Database (bằng Checkout/Cancel DB Lock).
+> **Không Bóc tách hay Né tránh Bug Lockout**:
+> Việc hệ thống bị timeout ở hàm băm mật khẩu `POST /login` khi nhận lượng RPS lớn và dẫn tới khóa tài khoản là một **đặc tính thất bại (Failure point)** của SUT.
+> Bài test KHÔNG ĐƯỢC PHÉP dùng mẹo (như setup thread group) để vượt qua bước Login một lần duy nhất. Nếu test sụp đổ và Error Rate đạt 100% do account bị khóa, bạn phải báo cáo kết quả đó như một phát hiện quan trọng (Critical Finding) của Spike Test, thay vì tìm cách che giấu nó.
