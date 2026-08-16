@@ -1,4 +1,4 @@
-# Đặc tả Yêu cầu Hệ thống (System Requirements Specification)
+﻿# Đặc tả Yêu cầu Hệ thống (System Requirements Specification)
 
 # EShop — Phiên bản dành cho Kiểm thử Phần mềm
 
@@ -144,15 +144,15 @@ Tại bước Checkout, người dùng có thể nhập mã giảm giá. Hệ th
 
 ```
                  [Admin xác nhận]          [Admin giao hàng]      [Admin hoàn tất]
-  ┌──────────┐ ─────────────────► ┌───────────┐ ──────────────► ┌──────────┐ ──────────► ┌───────────┐
-  │ pending  │                    │ confirmed │                  │ shipping │             │ delivered │
-  └──────────┘                    └───────────┘                  └──────────┘             └───────────┘
-       │                               │
-       │ [User/Admin hủy]              │ [User/Admin hủy]
-       ▼                               ▼
-  ┌──────────┐                    ┌──────────┐
-  │ canceled │                    │ canceled │
-  └──────────┘                    └──────────┘
+        
+   pending                       confirmed                    shipping               delivered 
+                                                     
+                                      
+        [User/Admin hủy]               [User/Admin hủy]
+                                      
+                      
+   canceled                      canceled 
+                      
 ```
 
 **Ràng buộc trạng thái kết thúc (Final States):**
@@ -286,3 +286,4 @@ Tại bước Checkout, người dùng có thể nhập mã giảm giá. Hệ th
 ---
 
 _Tài liệu này phục vụ cho mục đích học tập và thực hành Kiểm thử Phần mềm. Phiên bản: 2.0 — Cập nhật: 2026-05-14._
+
