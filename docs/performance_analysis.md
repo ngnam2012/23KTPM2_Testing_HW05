@@ -8,9 +8,9 @@
 
 _Baseline với 22 Threads, có Think-time._
 
-- **Tổng quan:** Tổng số lượng request là `3,161` requests, đạt Throughput `10.56 req/s`. Tuy nhiên, ngay cả ở mức tải bình thường, hệ thống đã xuất hiện **71.53% lỗi**.
+- **Tổng quan:** Tổng số lượng request là `3,158` requests, đạt Throughput `10.54 req/s`. Tuy nhiên, ngay cả ở mức tải bình thường, hệ thống đã xuất hiện **69.79% lỗi**.
 - **Phân tích Endpoint:**
-  - **Endpoint chậm nhất:** Dù bị lỗi nhiều, Response time trung bình toàn hệ thống (Avg) chỉ là `2.51ms` và P95 là `4.0ms`, chứng tỏ hệ thống trả về lỗi (Fast Failure) cực kỳ nhanh.
+  - **Endpoint chậm nhất:** Dù bị lỗi nhiều, Response time trung bình toàn hệ thống (Avg) chỉ là `2.14ms` và P95 là `4.0ms`, chứng tỏ hệ thống trả về lỗi (Fast Failure) cực kỳ nhanh.
   - **Error Pattern đáng chú ý:**
     - Lỗi này xảy ra chủ yếu do SQLite (Single-writer lock) khiến các request vào cùng lúc đụng độ (database is locked), cộng với việc tính hash password chậm dẫn đến Timeout và kích hoạt trigger khóa tài khoản (Lockout Bug). Khi login hỏng, 100% các API phía sau thiếu Token nên bị `401/403` hàng loạt.
 
@@ -18,16 +18,16 @@ _Baseline với 22 Threads, có Think-time._
 
 | Metric                | Load Test   | Stress Test  | Spike Test   |
 | --------------------- | ----------- | ------------ | ------------ |
-| **Total Samples**     | 3,161       | 13,700       | 5,306        |
-| **Throughput (TPS)**  | 10.56 req/s | 45.73 req/s  | 89.04 req/s  |
-| **Error Rate**        | 71.53%      | 71.66%       | 69.34%       |
-| **P95 Response Time** | 4.0 ms      | 3.0 ms       | 6.0 ms       |
+| **Total Samples**     | 3,158       | 13,631       | 5,304        |
+| **Throughput (TPS)**  | 10.54 req/s | 45.52 req/s  | 89.35 req/s  |
+| **Error Rate**        | 69.79%      | 69.77%       | 67.38%       |
+| **P95 Response Time** | 4.0 ms      | 4.0 ms       | 5.0 ms       |
 
 **Đánh giá:**
 
-1. **Breaking Point (Điểm gãy):** Xuyên suốt các bài test, Error Rate duy trì ở mức rất cao **~ 71%**. Đây chính là Breaking Point rõ rệt. Lỗi chủ yếu nằm ở các API Read-heavy và Transactional do SQLite bị khóa cứng (`database is locked`) và Event Loop của Node.js bị block bởi các tác vụ I/O dồn dập.
+1. **Breaking Point (Điểm gãy):** Xuyên suốt các bài test, Error Rate duy trì ở mức rất cao **~ 70%**. Đây chính là Breaking Point rõ rệt. Lỗi chủ yếu nằm ở các API Read-heavy và Transactional do SQLite bị khóa cứng (`database is locked`) và Event Loop của Node.js bị block bởi các tác vụ I/O dồn dập.
 2. **Response Time:** Dù bị gãy, Response time vẫn nằm ở mức rất thấp (chỉ vài ms). Lý do không phải là hệ thống chịu tải tốt, mà là hệ thống **trả về mã lỗi (500, 401, 403) ngay lập tức** thay vì xử lý thành công, khiến thời gian phản hồi trông có vẻ "nhanh" một cách giả tạo (Fast Failure).
-3. **Spike Recovery:** Spike Test tạo ra số lượng request khổng lồ trong thời gian rất ngắn. Tỷ lệ lỗi 69.34% phản ánh việc hệ thống không thể xử lý nổi lượng Concurrent Users cao. Tuy nhiên, kiến trúc in-memory cart lại không bị crash hẳn tiến trình Node.js (không thấy hiện tượng app chết hoàn toàn), mà chỉ từ chối phục vụ (Denial of Service) tại các khoảng thời gian bị Spike.
+3. **Spike Recovery:** Spike Test tạo ra số lượng request khổng lồ trong thời gian rất ngắn. Tỷ lệ lỗi 67.38% phản ánh việc hệ thống không thể xử lý nổi lượng Concurrent Users cao. Tuy nhiên, kiến trúc in-memory cart lại không bị crash hẳn tiến trình Node.js (không thấy hiện tượng app chết hoàn toàn), mà chỉ từ chối phục vụ (Denial of Service) tại các khoảng thời gian bị Spike.
 
 ## 3. Đề xuất Tối ưu hóa SUT (T2-3)
 

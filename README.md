@@ -3,8 +3,9 @@
 **Họ và tên:** NGUYỄN NHẬT NAM
 **MSSV:** 23127092
 **Lớp:** 23KTPM2
-**Github Repository:** [Link đến Repo của bạn]
-**Youtube Demo Video:** [Link đến Video của bạn]
+**Github Repository:** https://github.com/ngnam2012/23KTPM2_Testing_HW05
+**Youtube Demo Video (Performance Testing):** https://youtu.be/96VPOwmu7h0
+**Youtube Demo Video (Agent Skills - Bonus):** https://youtu.be/-cdfdlpFUzM
 
 ## 1. Test Summary Report
 
@@ -16,9 +17,9 @@ Qua quá trình xây dựng kịch bản kiểm thử hiệu năng với JMeter 
   - **Read-heavy:** `GET /api/users/me`, `GET /api/products`, `GET /api/products/{id}`
   - **Transactional:** `POST /api/apply-coupon`, `POST /api/checkout`, `PUT /api/orders/{id}/cancel`
 - **Endurance Threshold:**
-  - **Max stable RPS:** Đạt mức **10.84 req/s** trong suốt 15 phút.
+  - **Max stable RPS:** Đạt mức **10.80 req/s** trong suốt 15 phút.
   - **Memory Ceiling / CPU:** Hệ thống duy trì ổn định không rò rỉ RAM (memory leak).
-  - **Lỗi hệ thống (Bugs/Performance Issues):** Hệ thống có tỷ lệ lỗi (Error Rate) ổn định khoảng 71.74%, nguyên nhân không phải do hết tài nguyên mà do các giới hạn thiết kế / bugs nghiệp vụ.
+  - **Lỗi hệ thống (Bugs/Performance Issues):** Hệ thống có tỷ lệ lỗi (Error Rate) ổn định khoảng 69.94%, nguyên nhân không phải do hết tài nguyên mà do các giới hạn thiết kế / bugs nghiệp vụ.
 - **Số lượng bugs phát hiện:** **4 Bugs chính** (Account Lockout bug, Coupon Negative Bug, SQLite Concurrent Lock, In-memory Cart Race Condition).
 
 ## 2. Assessment Table
