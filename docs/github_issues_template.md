@@ -9,18 +9,18 @@ Dưới đây là 3 mẫu Issue chuẩn (được phân tích từ kết quả P
 **Labels:** `bug`, `performance`, `critical`
 
 ### Description
-During Load, Stress, and Spike testing with JMeter (22 concurrent threads), the application suffers a massive failure rate (~71%). The root cause is the SQLite database encountering write-lock contention (`SQLITE_BUSY: database is locked`). This happens because SQLite only supports a single writer at a time, and concurrent `POST /api/login` or Order APIs overwhelm the database lock queue.
+During Load, Stress, and Spike testing with JMeter (22 concurrent threads), the application suffers a massive failure rate (~69.8%). The root cause is the SQLite database encountering write-lock contention (`SQLITE_BUSY: database is locked`). This happens because SQLite only supports a single writer at a time, and concurrent `POST /api/login` or Order APIs overwhelm the database lock queue.
 
 ### Steps to Reproduce
 1. Start the Node.js backend server.
-2. Run a JMeter Load Test with 22 Threads (Ramp-up: 10s) targeting `POST /api/login` and other transactional endpoints.
+2. Run a JMeter Load Test with 22 Threads (Ramp-up: 22s) targeting `POST /api/login` and other transactional endpoints.
 3. Observe the backend terminal or JMeter View Results Tree.
 
 ### Expected Behavior
 The backend should queue the database transactions or use a connection pooling mechanism to handle concurrent requests without dropping them, returning 200 OK.
 
 ### Actual Behavior
-The server immediately rejects concurrent requests with HTTP 500. JMeter reports over 70% error rate. 
+The server immediately rejects concurrent requests with HTTP 500. JMeter reports ~69.8% overall error rate (with individual authenticated endpoints experiencing up to 95.1% failure due to cascade token failure). 
 Log snippet: `Error: SQLITE_BUSY: database is locked`.
 
 ### Suggested Fix
