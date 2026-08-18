@@ -119,4 +119,3 @@ graph TD
 - **Cấu hình Skill lưu tại:** `.agents/skills/auto-perf-tester/SKILL.md`
 
 ---
-**[HẾT BÁO CÁO]**
